@@ -1,4 +1,4 @@
-package com.hack.parser.solver;
+package com.hack.parser.solver.old;
 
 import com.github.javaparser.*;
 import com.github.javaparser.ast.CompilationUnit;
@@ -7,7 +7,6 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
-import com.github.javaparser.utils.SourceRoot;
 
 import java.io.IOException;
 import java.nio.file.*;

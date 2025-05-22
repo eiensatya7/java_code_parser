@@ -1,4 +1,4 @@
-package com.hack.parser.solver;
+package com.hack.parser.solver.old;
 
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;

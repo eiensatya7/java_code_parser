@@ -1,8 +1,10 @@
-package com.hack.parser.solver;
+package com.hack.parser.solver.fixed;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
+import com.hack.parser.solver.old.JavaParserUtils;
+import com.hack.parser.solver.old.TargetMethodFinder;
 
 import java.nio.file.*;
 import java.util.*;

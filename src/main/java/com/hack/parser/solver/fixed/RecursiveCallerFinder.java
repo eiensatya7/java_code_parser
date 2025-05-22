@@ -1,4 +1,4 @@
-package com.hack.parser.solver;
+package com.hack.parser.solver.fixed;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
@@ -11,7 +11,6 @@ import com.github.javaparser.resolution.UnsolvedSymbolException;
 import com.github.javaparser.resolution.declarations.*;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.*;
-import com.hack.parser.test.Helper;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -188,16 +187,17 @@ public class RecursiveCallerFinder {
     }
 
     /**
-     * 4. Main: parse, build reverse graph, set up for DFS, print ordered caller chains + full method sources.
+     * 4. Main: (Call directly for testing) parse, build reverse graph, set up for DFS, print ordered caller chains + full method sources.
      */
-    public static void main(String[] args) throws IOException {
-        // You can also accept args[0] as the target signature, but we’ll hardcode for demonstration:
-        String targetSignature = "com.hack.parser.test.Helper.helperMethod()";
-        String packagePrefix = "com.hack.parser.test";
-        Path sourceRoot = Paths.get("src/main/java");
 
-        calculatePrintCallerPaths(sourceRoot, packagePrefix, targetSignature);
-    }
+//    public static void main(String[] args) throws IOException {
+//        // You can also accept args[0] as the target signature, but we’ll hardcode for demonstration:
+//        String targetSignature = "com.hack.parser.test.Helper.helperMethod()";
+//        String packagePrefix = "com.hack.parser.test";
+//        Path sourceRoot = Paths.get("src/main/java");
+//
+//        calculatePrintCallerPaths(sourceRoot, packagePrefix, targetSignature);
+//    }
 
     public static void calculatePrintCallerPaths(Path sourceRoot, String packagePrefix, String targetSignature) throws IOException {
         // 4.1 Parse all .java files under src/main/java

@@ -7,7 +7,7 @@ public class TestSample {
 
     private Helper helper;
     /**
-     * Main method that starts the execution
+     * Main method that starts the execution, ok testing some things here
      */
     public static void main(String[] args) {
         TestSample sample = new TestSample();
