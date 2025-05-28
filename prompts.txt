@@ -1,0 +1,350 @@
+I created a Java program that takes Source Root, Target Class, and Line Number as input, and finds the caller chain for a specific method in that class. The program uses JavaParser to parse the source files and identify the method calls leading to the target method. 
+
+Input : 
+        Target Class: com.hack.parser.test.InnerHelperImpl2
+        Line Number: 16
+        Source Root: src/main/java
+
+Output :
+
+        === Method Caller Finder ===
+        Target Class: com.hack.parser.test.InnerHelperImpl2
+        Line Number: 16
+        Source Root: src/main/java
+        Package Prefix: com.hack.parser.test
+        ==============================
+
+        Finding caller chains for: com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int)
+
+        === Caller Chain ===
+
+        --- com.hack.parser.test.TestSample.main(java.lang.String[]) ---
+        /**
+         * Main method that starts the execution, ok testing some things here
+         */
+        public static void main(String[] args) {
+        TestSample sample = new TestSample();
+        sample.methodA();
+        }
+
+        --- com.hack.parser.test.TestSample.methodA() ---
+        /**
+         * First method in the call chain
+         */
+        public void methodA() {
+        System.out.println("In method A");
+        methodB(42);
+        }
+
+        --- com.hack.parser.test.TestSample.methodB(int) ---
+        /**
+         * Second method in the call chain
+         */
+        public void methodB(int value) {
+        System.out.println("In method B with value: " + value);
+        methodC("test");
+        }
+
+        --- com.hack.parser.test.TestSample.methodC(java.lang.String) ---
+        /**
+         * Third method in the call chain
+         */
+        public void methodC(String text) {
+        System.out.println("In method C with text: " + text);
+        // Create an object and call its method
+        //        HelperImpl helperImpl = new HelperImpl();
+        helper.helperMethod(9);
+        }
+
+        --- com.hack.parser.test.HelperImpl.helperMethod(int) ---
+        @Override
+        public void helperMethod(int a) {
+        System.out.println("In helper method" + a);
+        innerHelper.innerHelperMethod(8, 9);
+        }
+
+        --- com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int) ---
+        @Override
+        public void innerHelperMethod(int a, int b) {
+        System.out.println("InnerHelperImpl2 innerHelperMethod(int a, int b) called");
+        }
+        ====================
+
+        === Caller Chain ===
+
+        --- com.hack.parser.test.TestSample.main(java.lang.String[]) ---
+        /**
+         * Main method that starts the execution, ok testing some things here
+         */
+        public static void main(String[] args) {
+        TestSample sample = new TestSample();
+        sample.methodA();
+        }
+
+        --- com.hack.parser.test.TestSample.methodA() ---
+        /**
+         * First method in the call chain
+         */
+        public void methodA() {
+        System.out.println("In method A");
+        methodB(42);
+        }
+
+        --- com.hack.parser.test.TestSample.methodB(int) ---
+        /**
+         * Second method in the call chain
+         */
+        public void methodB(int value) {
+        System.out.println("In method B with value: " + value);
+        methodC("test");
+        }
+
+        --- com.hack.parser.test.TestSample.methodC(java.lang.String) ---
+        /**
+         * Third method in the call chain
+         */
+        public void methodC(String text) {
+        System.out.println("In method C with text: " + text);
+        // Create an object and call its method
+        //        HelperImpl helperImpl = new HelperImpl();
+        helper.helperMethod(9);
+        }
+
+        --- com.hack.parser.test.HelperImpl2.helperMethod(int) ---
+        @Override
+        public void helperMethod(int a) {
+        System.out.println("In helper impl 2 method" + a);
+        innerHelper.innerHelperMethod(8, 9);
+        }
+
+        --- com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int) ---
+        @Override
+        public void innerHelperMethod(int a, int b) {
+        System.out.println("InnerHelperImpl2 innerHelperMethod(int a, int b) called");
+        }
+        ====================
+
+
+        Process finished with exit code 0
+
+
+
+
+    -----------------------------------------------------------------------
+
+
+    Modify the Java program to output like this :
+
+
+    TREE_DAG_JSON:
+{
+  "root": {
+    "method": "com.hack.parser.test.TestSample.main(String[])",
+    "file": "src/main/java/com/hack/parser/test/TestSample.java",
+    "line": 12,
+    "children": [
+      {
+        "method": "com.hack.parser.test.TestSample.methodA()",
+        "file": "src/main/java/com/hack/parser/test/TestSample.java",
+        "line": 26,
+        "children": [
+          {
+            "method": "com.hack.parser.test.TestSample.methodB(int)",
+            "file": "src/main/java/com/hack/parser/test/TestSample.java",
+            "line": 41,
+            "children": [
+              {
+                "method": "com.hack.parser.test.TestSample.methodC(String)",
+                "file": "src/main/java/com/hack/parser/test/TestSample.java",
+                "line": 58,
+                "children": [
+                  {
+                    "method": "com.hack.parser.test.HelperImpl.helperMethod(int)",
+                    "file": "src/main/java/com/hack/parser/test/HelperImpl.java",
+                    "line": 15,
+                    "children": [
+                      {
+                        "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int,int)",
+                        "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                        "line": 16,
+                        "exception": "NullPointerException",
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "method": "com.hack.parser.test.HelperImpl2.helperMethod(int)",
+                    "file": "src/main/java/com/hack/parser/test/HelperImpl2.java",
+                    "line": 15,
+                    "children": [
+                      {
+                        "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int,int)",
+                        "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                        "line": 16,
+                        "exception": "NullPointerException",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+----------
+
+
+I created a Java program that takes Source Root, Target Class, and Line Number as input, and finds the caller chain for a specific method in that class. The program uses JavaParser to parse the source files and identify the method calls leading to the target method. 
+
+Main class : EnhancedMethodCallerFinderWithJson2
+
+Input : 
+        Target Class: com.hack.parser.test.InnerHelperImpl2
+        Line Number: 28
+        Source Root: src/main/java
+
+Output :
+
+/Users/sai/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home/bin/java -javaagent:/Applications/IntelliJ IDEA.app/Contents/lib/idea_rt.jar=57165 -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -classpath /Users/sai/Workspaces/hackathon_workspace/java_code_parser/target/classes:/Users/sai/.m2/repository/com/github/javaparser/javaparser-core/3.25.5/javaparser-core-3.25.5.jar:/Users/sai/.m2/repository/com/github/javaparser/javaparser-symbol-solver-core/3.25.5/javaparser-symbol-solver-core-3.25.5.jar:/Users/sai/.m2/repository/org/javassist/javassist/3.29.2-GA/javassist-3.29.2-GA.jar:/Users/sai/.m2/repository/com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar:/Users/sai/.m2/repository/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar:/Users/sai/.m2/repository/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/Users/sai/.m2/repository/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar:/Users/sai/.m2/repository/org/checkerframework/checker-qual/3.33.0/checker-qual-3.33.0.jar:/Users/sai/.m2/repository/com/google/errorprone/error_prone_annotations/2.18.0/error_prone_annotations-2.18.0.jar:/Users/sai/.m2/repository/com/google/j2objc/j2objc-annotations/2.8/j2objc-annotations-2.8.jar:/Users/sai/.m2/repository/com/google/code/gson/gson/2.10.1/gson-2.10.1.jar com.hack.parser.solver.enhanced.EnhancedMethodCallerFinderWithJson2
+TREE_DAG_JSON:
+{
+  "root": {
+    "method": "com.hack.parser.test.TestSample.main(java.lang.String[])",
+    "file": "src/main/java/com/hack/parser/test/TestSample.java",
+    "line": 12,
+    "children": [
+      {
+        "method": "com.hack.parser.test.TestSample.methodA()",
+        "file": "src/main/java/com/hack/parser/test/TestSample.java",
+        "line": 20,
+        "children": [
+          {
+            "method": "com.hack.parser.test.TestSample.methodB(int)",
+            "file": "src/main/java/com/hack/parser/test/TestSample.java",
+            "line": 28,
+            "children": [
+              {
+                "method": "com.hack.parser.test.TestSample.methodC(java.lang.String)",
+                "file": "src/main/java/com/hack/parser/test/TestSample.java",
+                "line": 36,
+                "children": [
+                  {
+                    "method": "com.hack.parser.test.HelperImpl.helperMethod(int)",
+                    "file": "src/main/java/com/hack/parser/test/HelperImpl.java",
+                    "line": 16,
+                    "children": [
+                      {
+                        "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int)",
+                        "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                        "line": 14,
+                        "children": [
+                          {
+                            "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod()",
+                            "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                            "line": 4,
+                            "children": [
+                              {
+                                "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int, int)",
+                                "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                                "line": 20,
+                                "children": [
+                                  {
+                                    "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int, int, int)",
+                                    "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                                    "line": 26,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "method": "com.hack.parser.test.HelperImpl2.helperMethod(int)",
+                    "file": "src/main/java/com/hack/parser/test/HelperImpl2.java",
+                    "line": 16,
+                    "children": [
+                      {
+                        "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int)",
+                        "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                        "line": 14,
+                        "children": [
+                          {
+                            "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod()",
+                            "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                            "line": 4,
+                            "children": [
+                              {
+                                "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int, int)",
+                                "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                                "line": 20,
+                                "children": [
+                                  {
+                                    "method": "com.hack.parser.test.InnerHelperImpl2.innerHelperMethod(int, int, int, int)",
+                                    "file": "src/main/java/com/hack/parser/test/InnerHelperImpl2.java",
+                                    "line": 26,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+Process finished with exit code 0
+
+
+
+
+
+-----------------------------------------------------------------------
+
+
+  Modify the Java program to return the method body and method comments as part of output.
+
+  create a wrapper object that has two parts:
+
+  {
+    dag_tree: {...},
+    methods: [
+      method: {
+      name: "methodName",
+      body: "method body here",
+      comments: "method comments here"
+      },
+      ...
+    ]
+  }
+
+
+
+
+
+
+You are an expert Java debugger. An exception was thrown inside `InnerHelperImpl2.innerHelperMethod(int,int,int,int)` at line 32. We have reconstructed the entire caller‐chain as a Tree/DAG below.  
+
+1. First, confirm that the tree is well‐formed (no missing links).  
+2. Then walk through each branch from `root` down to every leaf and understand the context of the code.  
+3. Correlate with the provided log data for the total call.  
+4. Finally, provide a concise bullet‐list of possible fixes or safeguards to prevent the exception.

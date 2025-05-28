@@ -1,16 +1,20 @@
 package com.hack.parser.test;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * A sample class to test the Java parser functionality
  */
+@Slf4j
 public class TestSample {
 
-    private Helper helper;
+    private Helper helper = new HelperImpl2();
     /**
      * Main method that starts the execution, ok testing some things here
      */
     public static void main(String[] args) {
         TestSample sample = new TestSample();
+        log.info("Starting TestSample execution");
         sample.methodA();
     }
 
@@ -18,7 +22,7 @@ public class TestSample {
      * First method in the call chain
      */
     public void methodA() {
-        System.out.println("In method A");
+        log.info("In method A");
         methodB(42);
     }
 
@@ -26,7 +30,7 @@ public class TestSample {
      * Second method in the call chain
      */
     public void methodB(int value) {
-        System.out.println("In method B with value: " + value);
+        log.info("In method B with value: {}", value);
         methodC("test");
     }
 
@@ -34,11 +38,11 @@ public class TestSample {
      * Third method in the call chain
      */
     public void methodC(String text) {
-        System.out.println("In method C with text: " + text);
+        log.info("In method C with text: {}", text);
 
         // Create an object and call its method
 //        HelperImpl helperImpl = new HelperImpl();
-        helper.helperMethod(9);
+        helper.helperMethod(0);
     }
 
 }

@@ -1,4 +1,4 @@
-package com.hack.parser.solver.enhanced;
+package com.hack.parser.solver.deprecated;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.PackageDeclaration;

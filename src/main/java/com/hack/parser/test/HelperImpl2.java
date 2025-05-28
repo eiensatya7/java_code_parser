@@ -1,27 +1,30 @@
 package com.hack.parser.test;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * A sample class to test the Java parser functionality
  */
+@Slf4j
 public class HelperImpl2 implements Helper {
 
-    private InnerHelper innerHelper;
+    private InnerHelper innerHelper = new InnerHelperImpl2();
 
 
     @Override
     public void helperMethod() {
-        System.out.println("In helper impl 2 method");
+        log.info("In helper impl 2 method");
     }
 
     @Override
     public void helperMethod(int a) {
-        System.out.println("In helper impl 2 method"+a);
-        innerHelper.innerHelperMethod(8,9);
+        log.info("In helper impl 2 method"+a);
+        innerHelper.innerHelperMethod(a,9);
     }
 
     @Override
     public void helperMethod(int a, int b) {
-        System.out.println("In helper impl 2 method");
+        log.info("In helper impl 2 method");
     }
 
 }

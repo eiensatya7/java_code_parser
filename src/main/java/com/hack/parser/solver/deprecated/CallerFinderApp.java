@@ -1,4 +1,4 @@
-package com.hack.parser.solver.enhanced;
+package com.hack.parser.solver.deprecated;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;

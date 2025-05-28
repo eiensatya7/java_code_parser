@@ -1,4 +1,4 @@
-package com.hack.parser.solver.enhanced;
+package com.hack.parser.solver.deprecated;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
@@ -13,32 +13,29 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
- * Enhanced method caller finder that handles interface implementations
- * and provides optimized call chain analysis.
- *
- * Key improvements:
- * 1. Simplified architecture with single class handling all functionality
- * 2. Interface-to-implementation mapping for static analysis
- * 3. Enhanced method resolution for interface calls
- * 4. Optimized parsing and caching
- * 5. Better error handling and cycle detection
+ * Enhanced method caller finder that outputs results in JSON tree format
  */
-public class EnhancedMethodCallerFinderNewer {
+public class EnhancedMethodCallerFinderWithJson {
 
     private final JavaParser parser;
     private final String packagePrefix;
+    private final Path sourceRoot;
+    private Map<String, String> methodToFilePath = new HashMap<>();
+    private Map<String, Integer> methodToLineNumber = new HashMap<>();
 
-    public EnhancedMethodCallerFinderNewer(Path sourceRoot, String packagePrefix) {
+    public EnhancedMethodCallerFinderWithJson(Path sourceRoot, String packagePrefix) {
         this.packagePrefix = packagePrefix;
+        this.sourceRoot = sourceRoot;
         this.parser = createParser(sourceRoot);
     }
 
@@ -53,7 +50,7 @@ public class EnhancedMethodCallerFinderNewer {
     }
 
     /**
-     * Main entry point to find and print caller chains for a method at a specific line
+     * Main entry point to find and output caller chains as JSON
      */
     public void findCallerChains(Path sourceRoot, String fullyQualifiedClassName, int lineNumber) {
         try {
@@ -67,32 +64,46 @@ public class EnhancedMethodCallerFinderNewer {
                 return;
             }
 
+            // Build method metadata maps
+            buildMethodMetadata(compilationUnits);
+
             // Build interface implementation mapping
             Map<String, Set<String>> interfaceToImplementations = buildInterfaceImplementationMap(compilationUnits);
 
-            // Build reverse call graph with interface resolution
-            Map<String, Set<String>> reverseCallGraph = buildEnhancedReverseCallGraph(
-                    compilationUnits, interfaceToImplementations);
-
-            // Build signature to method mapping
-            Map<String, MethodDeclaration> signatureToMethod = buildSignatureToMethodMap(compilationUnits);
+            // Build call graph (forward direction)
+            Map<String, Set<String>> callGraph = buildEnhancedCallGraph(compilationUnits, interfaceToImplementations);
 
             // Get target method signature
             String targetSignature = getMethodSignature(targetMethod);
 
-            System.out.println("Finding caller chains for: " + targetSignature + "\n");
+            // Build tree starting from all entry points
+            CallTreeNode rootNode = buildCallTree(targetSignature, callGraph);
 
-            // Find and print all caller chains with interface implementation details
-            Set<String> visited = new HashSet<>();
-            List<String> currentPath = new ArrayList<>();
-            currentPath.add(targetSignature);
-
-            findAndPrintCallerChains(targetSignature, reverseCallGraph, currentPath,
-                    visited, signatureToMethod, interfaceToImplementations);
+            // Convert to JSON and output
+            outputJsonTree(rootNode);
 
         } catch (Exception e) {
             System.err.println("Error analyzing caller chains: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void buildMethodMetadata(Map<String, CompilationUnit> compilationUnits) {
+        for (Map.Entry<String, CompilationUnit> entry : compilationUnits.entrySet()) {
+            String filePath = entry.getKey();
+            CompilationUnit cu = entry.getValue();
+
+            for (MethodDeclaration method : cu.findAll(MethodDeclaration.class)) {
+                try {
+                    String signature = getMethodSignature(method);
+                    methodToFilePath.put(signature, filePath);
+                    if (method.getRange().isPresent()) {
+                        methodToLineNumber.put(signature, method.getRange().get().begin.line);
+                    }
+                } catch (Exception e) {
+                    // Skip unresolvable methods
+                }
+            }
         }
     }
 
@@ -137,9 +148,6 @@ public class EnhancedMethodCallerFinderNewer {
         return null;
     }
 
-    /**
-     * Build mapping from interface signatures to their implementation signatures
-     */
     private Map<String, Set<String>> buildInterfaceImplementationMap(Map<String, CompilationUnit> compilationUnits) {
         Map<String, Set<String>> interfaceToImpls = new HashMap<>();
 
@@ -149,18 +157,15 @@ public class EnhancedMethodCallerFinderNewer {
 
             for (ClassOrInterfaceDeclaration clazz : cu.findAll(ClassOrInterfaceDeclaration.class)) {
                 if (!clazz.isInterface() && !clazz.getImplementedTypes().isEmpty()) {
-                    // This is a class implementing interfaces
                     for (MethodDeclaration method : clazz.getMethods()) {
                         try {
                             String implSignature = getMethodSignature(method);
 
-                            // Find corresponding interface methods
                             for (var implementedType : clazz.getImplementedTypes()) {
                                 try {
                                     ResolvedReferenceTypeDeclaration resolvedInterface =
                                             implementedType.resolve().asReferenceType().getTypeDeclaration().get();
 
-                                    // Look for matching method in interface
                                     String interfaceSignature = findInterfaceMethodSignature(
                                             resolvedInterface, method.getNameAsString(), method);
 
@@ -192,7 +197,6 @@ public class EnhancedMethodCallerFinderNewer {
                 if (interfaceMethod.getName().equals(methodName) &&
                         interfaceMethod.getNumberOfParams() == resolvedImpl.getNumberOfParams()) {
 
-                    // Check parameter types match
                     boolean paramsMatch = true;
                     for (int i = 0; i < interfaceMethod.getNumberOfParams(); i++) {
                         if (!interfaceMethod.getParam(i).getType().equals(resolvedImpl.getParam(i).getType())) {
@@ -213,13 +217,13 @@ public class EnhancedMethodCallerFinderNewer {
     }
 
     /**
-     * Build enhanced reverse call graph that resolves interface calls to implementations
+     * Build forward call graph (caller -> callees)
      */
-    private Map<String, Set<String>> buildEnhancedReverseCallGraph(
+    private Map<String, Set<String>> buildEnhancedCallGraph(
             Map<String, CompilationUnit> compilationUnits,
             Map<String, Set<String>> interfaceToImplementations) {
 
-        Map<String, Set<String>> reverseCallGraph = new HashMap<>();
+        Map<String, Set<String>> callGraph = new HashMap<>();
 
         for (CompilationUnit cu : compilationUnits.values()) {
             Optional<PackageDeclaration> pkg = cu.getPackageDeclaration();
@@ -232,22 +236,21 @@ public class EnhancedMethodCallerFinderNewer {
                 for (MethodDeclaration method : clazz.getMethods()) {
                     String callerSignature = getMethodSignature(method);
 
-                    // Find all method calls in this method
                     for (MethodCallExpr callExpr : method.findAll(MethodCallExpr.class)) {
                         try {
                             ResolvedMethodDeclaration resolvedCallee = callExpr.resolve();
                             String calleeSignature = resolvedCallee.getQualifiedSignature();
 
                             // Add direct call relationship
-                            reverseCallGraph.computeIfAbsent(calleeSignature, k -> new HashSet<>())
-                                    .add(callerSignature);
+                            callGraph.computeIfAbsent(callerSignature, k -> new HashSet<>())
+                                    .add(calleeSignature);
 
-                            // If this is an interface call, also add relationships to ALL implementations
+                            // If this is an interface call, also add relationships to implementations
                             Set<String> implementations = interfaceToImplementations.get(calleeSignature);
                             if (implementations != null) {
                                 for (String implSignature : implementations) {
-                                    reverseCallGraph.computeIfAbsent(implSignature, k -> new HashSet<>())
-                                            .add(callerSignature);
+                                    callGraph.computeIfAbsent(callerSignature, k -> new HashSet<>())
+                                            .add(implSignature);
                                 }
                             }
 
@@ -259,24 +262,103 @@ public class EnhancedMethodCallerFinderNewer {
             }
         }
 
-        return reverseCallGraph;
+        return callGraph;
     }
 
-    private Map<String, MethodDeclaration> buildSignatureToMethodMap(Map<String, CompilationUnit> compilationUnits) {
-        Map<String, MethodDeclaration> signatureToMethod = new HashMap<>();
+    private CallTreeNode buildCallTree(String targetSignature, Map<String, Set<String>> callGraph) {
+        // Find all paths that lead to the target method
+        Map<String, Set<String>> reverseCallGraph = new HashMap<>();
 
-        for (CompilationUnit cu : compilationUnits.values()) {
-            for (MethodDeclaration method : cu.findAll(MethodDeclaration.class)) {
-                try {
-                    String signature = getMethodSignature(method);
-                    signatureToMethod.put(signature, method);
-                } catch (Exception e) {
-                    // Skip unresolvable methods
+        // Build reverse call graph
+        for (Map.Entry<String, Set<String>> entry : callGraph.entrySet()) {
+            String caller = entry.getKey();
+            for (String callee : entry.getValue()) {
+                reverseCallGraph.computeIfAbsent(callee, k -> new HashSet<>()).add(caller);
+            }
+        }
+
+        // Find entry points (methods with no callers)
+        Set<String> entryPoints = new HashSet<>();
+        for (String method : callGraph.keySet()) {
+            if (!reverseCallGraph.containsKey(method) || reverseCallGraph.get(method).isEmpty()) {
+                entryPoints.add(method);
+            }
+        }
+
+        // Build tree from entry points that can reach the target
+        CallTreeNode root = new CallTreeNode();
+        root.method = "ROOT";
+        root.children = new ArrayList<>();
+
+        for (String entryPoint : entryPoints) {
+            CallTreeNode entryNode = buildTreeNode(entryPoint, targetSignature, callGraph, new HashSet<>());
+            if (entryNode != null && canReachTarget(entryNode, targetSignature)) {
+                root.children.add(entryNode);
+            }
+        }
+
+        // If no entry points found, create a simplified tree
+        if (root.children.isEmpty()) {
+            CallTreeNode targetNode = createNodeFromSignature(targetSignature);
+            root.children.add(targetNode);
+        }
+
+        return root;
+    }
+
+    private CallTreeNode buildTreeNode(String currentSignature, String targetSignature,
+                                       Map<String, Set<String>> callGraph, Set<String> visited) {
+        if (visited.contains(currentSignature)) {
+            return null; // Avoid cycles
+        }
+
+        visited.add(currentSignature);
+        CallTreeNode node = createNodeFromSignature(currentSignature);
+
+        if (currentSignature.equals(targetSignature)) {
+            // Target reached - no children needed
+            visited.remove(currentSignature);
+            return node;
+        }
+
+        Set<String> callees = callGraph.getOrDefault(currentSignature, new HashSet<>());
+        for (String callee : callees) {
+            // Only include callees that are part of our package prefix (exclude system calls like println)
+            if (callee.startsWith(packagePrefix)) {
+                CallTreeNode childNode = buildTreeNode(callee, targetSignature, callGraph, visited);
+                if (childNode != null) {
+                    node.children.add(childNode);
                 }
             }
         }
 
-        return signatureToMethod;
+        visited.remove(currentSignature);
+
+        // Only return this node if it can reach the target (has children or is the target)
+        return (node.children.isEmpty() && !currentSignature.equals(targetSignature)) ? null : node;
+    }
+
+    private boolean canReachTarget(CallTreeNode node, String targetSignature) {
+        if (node.method.equals(targetSignature)) {
+            return true;
+        }
+
+        for (CallTreeNode child : node.children) {
+            if (canReachTarget(child, targetSignature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private CallTreeNode createNodeFromSignature(String signature) {
+        CallTreeNode node = new CallTreeNode();
+        node.method = signature;
+        node.file = methodToFilePath.getOrDefault(signature, "unknown");
+        node.line = methodToLineNumber.getOrDefault(signature, 0);
+        node.children = new ArrayList<>();
+        return node;
     }
 
     private String getMethodSignature(MethodDeclaration method) {
@@ -288,106 +370,53 @@ public class EnhancedMethodCallerFinderNewer {
         }
     }
 
-    private void findAndPrintCallerChains(String currentSignature,
-                                          Map<String, Set<String>> reverseCallGraph,
-                                          List<String> currentPath,
-                                          Set<String> visited,
-                                          Map<String, MethodDeclaration> signatureToMethod,
-                                          Map<String, Set<String>> interfaceToImplementations) {
+    private void outputJsonTree(CallTreeNode rootNode) {
+        // Create the final JSON structure
+        JsonOutput output = new JsonOutput();
 
-        Set<String> callers = reverseCallGraph.getOrDefault(currentSignature, Collections.emptySet());
-
-        if (callers.isEmpty()) {
-            // End of chain - print the complete path
-            printCallerChainWithImplementations(currentPath, signatureToMethod, interfaceToImplementations);
-            return;
+        if (!rootNode.children.isEmpty()) {
+            output.root = rootNode.children.get(0); // Take the first (and likely only) entry point
+        } else {
+            output.root = rootNode;
         }
 
-        for (String caller : callers) {
-            if (visited.contains(caller)) {
-                continue; // Avoid cycles
-            }
-
-            visited.add(caller);
-            currentPath.add(caller);
-
-            findAndPrintCallerChains(caller, reverseCallGraph, currentPath, visited,
-                    signatureToMethod, interfaceToImplementations);
-
-            // Backtrack
-            currentPath.remove(currentPath.size() - 1);
-            visited.remove(caller);
-        }
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        System.out.println("TREE_DAG_JSON:");
+        System.out.println(gson.toJson(output));
     }
 
-    private void printCallerChainWithImplementations(List<String> path,
-                                                     Map<String, MethodDeclaration> signatureToMethod,
-                                                     Map<String, Set<String>> interfaceToImplementations) {
-        System.out.println("=== Caller Chain ===");
-
-        // Print in reverse order (from caller to target)
-        for (int i = path.size() - 1; i >= 0; i--) {
-            String signature = path.get(i);
-            MethodDeclaration method = signatureToMethod.get(signature);
-
-            System.out.println("\n--- " + signature + " ---");
-
-            // Check if this method has multiple implementations (only show for non-first elements)
-            if (i < path.size() - 1) { // Don't show implementations for the root caller
-                Set<String> implementations = findImplementationsForSignature(signature, interfaceToImplementations);
-                if (implementations.size() > 1) {
-                    System.out.println("// PROBABLE IMPLEMENTATION CALLS:");
-                    for (String impl : implementations) {
-                        if (!impl.equals(signature)) { // Don't show the current one twice
-                            System.out.println("//   - " + impl);
-                        }
-                    }
-                    System.out.println();
-                }
-            }
-
-            if (method != null) {
-                System.out.println(method.toString());
-            } else {
-                System.out.println("(Method source not found)");
-            }
-        }
-        System.out.println("====================\n");
+    // JSON structure classes
+    static class JsonOutput {
+        CallTreeNode root;
     }
 
-    /**
-     * Find all implementations for a given signature (including interface methods)
-     */
-    private Set<String> findImplementationsForSignature(String signature,
-                                                        Map<String, Set<String>> interfaceToImplementations) {
-        Set<String> allImplementations = new HashSet<>();
-        allImplementations.add(signature); // Include the original signature
-
-        // Check if this signature is an interface method with implementations
-        Set<String> directImplementations = interfaceToImplementations.get(signature);
-        if (directImplementations != null) {
-            allImplementations.addAll(directImplementations);
-        }
-
-        // Also check if any interface methods map to this signature as an implementation
-        for (Map.Entry<String, Set<String>> entry : interfaceToImplementations.entrySet()) {
-            if (entry.getValue().contains(signature)) {
-                allImplementations.add(entry.getKey()); // Add the interface method
-                allImplementations.addAll(entry.getValue()); // Add all other implementations
-            }
-        }
-
-        return allImplementations;
+    static class CallTreeNode {
+        String method;
+        String file;
+        int line;
+        List<CallTreeNode> children = new ArrayList<>();
     }
 
     // Main method for testing
     public static void main(String[] args) {
-        String fullyQualifiedClassName = "com.hack.parser.test.HelperImpl";
-        int lineNumber = 15;
+        String fullyQualifiedClassName = "com.hack.parser.test.InnerHelperImpl2";
+        int lineNumber = 28;
         Path sourceRoot = Paths.get("src/main/java");
         String packagePrefix = "com.hack.parser.test";
 
-        EnhancedMethodCallerFinder finder = new EnhancedMethodCallerFinder(sourceRoot, packagePrefix);
+        if (args.length >= 4) {
+            fullyQualifiedClassName = args[0];
+            try {
+                lineNumber = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid line number: " + args[1]);
+                System.exit(1);
+            }
+            sourceRoot = Paths.get(args[2]);
+            packagePrefix = args[3];
+        }
+
+        EnhancedMethodCallerFinderWithJson finder = new EnhancedMethodCallerFinderWithJson(sourceRoot, packagePrefix);
         finder.findCallerChains(sourceRoot, fullyQualifiedClassName, lineNumber);
     }
 }

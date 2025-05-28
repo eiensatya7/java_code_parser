@@ -1,4 +1,4 @@
-package com.hack.parser.solver.enhanced;
+package com.hack.parser.solver.deprecated;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
@@ -19,7 +19,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Enhanced method caller finder that handles interface implementations
@@ -32,12 +31,12 @@ import java.util.stream.Collectors;
  * 4. Optimized parsing and caching
  * 5. Better error handling and cycle detection
  */
-public class EnhancedMethodCallerFinder {
+public class EnhancedMethodCallerFinderNewer {
 
     private final JavaParser parser;
     private final String packagePrefix;
 
-    public EnhancedMethodCallerFinder(Path sourceRoot, String packagePrefix) {
+    public EnhancedMethodCallerFinderNewer(Path sourceRoot, String packagePrefix) {
         this.packagePrefix = packagePrefix;
         this.parser = createParser(sourceRoot);
     }
@@ -142,7 +141,6 @@ public class EnhancedMethodCallerFinder {
      */
     private Map<String, Set<String>> buildInterfaceImplementationMap(Map<String, CompilationUnit> compilationUnits) {
         Map<String, Set<String>> interfaceToImpls = new HashMap<>();
-        Map<String, Set<String>> interfaceMethods = findAllInterfaceMethods(compilationUnits);
 
         for (CompilationUnit cu : compilationUnits.values()) {
             Optional<PackageDeclaration> pkg = cu.getPackageDeclaration();
@@ -182,40 +180,6 @@ public class EnhancedMethodCallerFinder {
         }
 
         return interfaceToImpls;
-    }
-
-    /**
-     * Find all interface methods in the codebase
-     */
-    private Map<String, Set<String>> findAllInterfaceMethods(Map<String, CompilationUnit> compilationUnits) {
-        Map<String, Set<String>> interfaceMethods = new HashMap<>();
-
-        for (CompilationUnit cu : compilationUnits.values()) {
-            Optional<PackageDeclaration> pkg = cu.getPackageDeclaration();
-            if (pkg.isEmpty() || !pkg.get().getNameAsString().startsWith(packagePrefix)) continue;
-
-            for (ClassOrInterfaceDeclaration clazz : cu.findAll(ClassOrInterfaceDeclaration.class)) {
-                if (clazz.isInterface()) {
-                    String interfaceName = pkg.get().getNameAsString() + "." + clazz.getNameAsString();
-                    Set<String> methods = new HashSet<>();
-
-                    for (MethodDeclaration method : clazz.getMethods()) {
-                        try {
-                            String signature = getMethodSignature(method);
-                            methods.add(signature);
-                        } catch (Exception e) {
-                            // Skip unresolvable methods
-                        }
-                    }
-
-                    if (!methods.isEmpty()) {
-                        interfaceMethods.put(interfaceName, methods);
-                    }
-                }
-            }
-        }
-
-        return interfaceMethods;
     }
 
     private String findInterfaceMethodSignature(ResolvedReferenceTypeDeclaration interfaceDecl,
@@ -277,14 +241,13 @@ public class EnhancedMethodCallerFinder {
                             reverseCallGraph.computeIfAbsent(calleeSignature, k -> new HashSet<>())
                                     .add(callerSignature);
 
-                            // If this is an interface call, only add the first implementation
-                            // We'll handle multiple implementations during printing
+                            // If this is an interface call, also add relationships to ALL implementations
                             Set<String> implementations = interfaceToImplementations.get(calleeSignature);
-                            if (implementations != null && !implementations.isEmpty()) {
-                                // Just use the first implementation for the call graph
-                                String firstImpl = implementations.iterator().next();
-                                reverseCallGraph.computeIfAbsent(firstImpl, k -> new HashSet<>())
-                                        .add(callerSignature);
+                            if (implementations != null) {
+                                for (String implSignature : implementations) {
+                                    reverseCallGraph.computeIfAbsent(implSignature, k -> new HashSet<>())
+                                            .add(callerSignature);
+                                }
                             }
 
                         } catch (Exception e) {
@@ -368,16 +331,18 @@ public class EnhancedMethodCallerFinder {
 
             System.out.println("\n--- " + signature + " ---");
 
-            // Check if this method has multiple implementations
-            Set<String> implementations = findImplementationsForSignature(signature, interfaceToImplementations);
-            if (implementations.size() > 1) {
-                System.out.println("// PROBABLE IMPLEMENTATION CALLS:");
-                for (String impl : implementations) {
-                    if (!impl.equals(signature)) { // Don't show the current one twice
-                        System.out.println("//   - " + impl);
+            // Check if this method has multiple implementations (only show for non-first elements)
+            if (i < path.size() - 1) { // Don't show implementations for the root caller
+                Set<String> implementations = findImplementationsForSignature(signature, interfaceToImplementations);
+                if (implementations.size() > 1) {
+                    System.out.println("// PROBABLE IMPLEMENTATION CALLS:");
+                    for (String impl : implementations) {
+                        if (!impl.equals(signature)) { // Don't show the current one twice
+                            System.out.println("//   - " + impl);
+                        }
                     }
+                    System.out.println();
                 }
-                System.out.println();
             }
 
             if (method != null) {
